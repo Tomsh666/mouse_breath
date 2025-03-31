@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"fyne.io/fyne/v2/widget"
+	"math/rand"
 	"strconv"
 )
+
+var measurementData [][]interface{}
 
 func startMeasuring(entry *widget.Entry) {
 	secondsStr := entry.Text
@@ -14,6 +17,19 @@ func startMeasuring(entry *widget.Entry) {
 		return
 	}
 	fmt.Println("Seconds:", seconds)
-	// TODO: Добавить логику для старта измерения, для отправки seconds на контроллер
+
+	measurementData = make([][]interface{}, 2)
+	for i := range measurementData {
+		measurementData[i] = make([]interface{}, seconds)
+	}
+
+	tmpFunc(seconds) //TODO: поменять заглушку, как-то передавать занчения с контроллера в массив
 	fmt.Println("measuring")
+}
+
+func tmpFunc(seconds int) { //Заглушка
+	for i := 0; i < seconds; i++ {
+		measurementData[0][i] = i + 1
+		measurementData[1][i] = rand.Intn(100)
+	}
 }

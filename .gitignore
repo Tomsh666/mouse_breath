@@ -1,0 +1,36 @@
+# Бинарные файлы и исполняемые файлы, сгенерированные Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Файлы сборки и кэш
+*.test
+*.out
+/bin/
+/pkg/
+
+# Временные файлы
+*.log
+*.tmp
+*.swp
+
+# Директория зависимостей (если используешь vendor)
+/vendor/
+
+# Файлы IDE и редакторов
+.idea/          # IntelliJ IDEA (например, GoLand)
+*.iml           # IntelliJ IDEA модули
+.vscode/        # Visual Studio Code
+*.sublime-*     # Sublime Text
+
+# Локальные конфигурации и отладочные файлы
+debug/
+*.prof          # Профили производительности
+
+# macOS
+.DS_Store
+
+# Локальные переменные окружения
+.env

@@ -1,21 +1,56 @@
 package main
 
 import (
-  "fmt"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
+	"strings"
+	"unicode"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-
 func main() {
-  //TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-  // to see how GoLand suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-  s := "gopher"
-  fmt.Println("Hello and welcome, %s!", s)
+	a := app.New()
+	w := a.NewWindow("App name") //TODO: изменить название название
 
-  for i := 1; i <= 5; i++ {
-	//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-	// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-	fmt.Println("i =", 100/i)
-  }
+	nameOfTheExperimentLabel := widget.NewLabel("Name of experiment")
+	nameOfTheExperimentEntry := widget.NewEntry()
+	nameOfTheExperimentEntry.SetPlaceHolder("Enter name of experiment")
+
+	durationOfTheExperimentLabel := widget.NewLabel("Time of measuring (sec):")
+	durationOfTheExperimentEntry := widget.NewEntry()
+	durationOfTheExperimentEntry.SetPlaceHolder("Enter time in seconds")
+
+	durationOfTheExperimentEntry.OnChanged = func(s string) {
+		var filtered strings.Builder
+		for _, r := range s {
+			if unicode.IsDigit(r) {
+				filtered.WriteRune(r)
+			}
+		}
+		if s != filtered.String() {
+			durationOfTheExperimentEntry.SetText(filtered.String())
+		}
+	}
+
+	buttonMeasure := widget.NewButton("Start Measuring", func() {
+		startMeasuring(durationOfTheExperimentEntry)
+	})
+
+	buttonUploadToTable := widget.NewButton("Upload values to table", func() {
+		uploadValuesToTable(nameOfTheExperimentEntry, durationOfTheExperimentEntry)
+	})
+
+	content := container.NewVBox(
+		nameOfTheExperimentLabel,
+		nameOfTheExperimentEntry,
+		durationOfTheExperimentLabel,
+		durationOfTheExperimentEntry,
+		buttonMeasure,
+		buttonUploadToTable,
+	)
+
+	w.SetContent(content)
+	w.Resize(fyne.NewSize(300, 200))
+	w.ShowAndRun()
 }

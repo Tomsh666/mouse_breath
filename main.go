@@ -1,56 +1,93 @@
 package main
 
 import (
+	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"strings"
-	"unicode"
+	"strconv"
 )
 
 func main() {
-	a := app.New()
-	w := a.NewWindow("App name") //TODO: изменить название название
+	myApp := app.New()
+	myWindow := myApp.NewWindow("Обработка результатов")
 
-	nameOfTheExperimentLabel := widget.NewLabel("Name of experiment")
-	nameOfTheExperimentEntry := widget.NewEntry()
-	nameOfTheExperimentEntry.SetPlaceHolder("Enter name of experiment")
+	var selectedFile string
 
-	durationOfTheExperimentLabel := widget.NewLabel("Time of measuring (sec):")
-	durationOfTheExperimentEntry := widget.NewEntry()
-	durationOfTheExperimentEntry.SetPlaceHolder("Enter time in seconds")
+	fileLabel := widget.NewLabel("Файл не выбрана")
 
-	durationOfTheExperimentEntry.OnChanged = func(s string) {
-		var filtered strings.Builder
-		for _, r := range s {
-			if unicode.IsDigit(r) {
-				filtered.WriteRune(r)
+	btnSelect := widget.NewButton("Выбрать файл", func() {
+		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, myWindow)
+				return
 			}
-		}
-		if s != filtered.String() {
-			durationOfTheExperimentEntry.SetText(filtered.String())
-		}
-	}
-
-	buttonMeasure := widget.NewButton("Start Measuring", func() {
-		startMeasuring(durationOfTheExperimentEntry)
+			if reader != nil {
+				selectedFile = reader.URI().Path()
+				fileLabel.SetText("Выбран файл:\n" + selectedFile)
+			}
+		}, myWindow)
 	})
 
-	buttonUploadToTable := widget.NewButton("Upload values to table", func() {
-		uploadValuesToTable(nameOfTheExperimentEntry, durationOfTheExperimentEntry)
+	btnConvertExcel := widget.NewButton("Преобразовать в Excel", func() {
+		if selectedFile == "" {
+			dialog.ShowInformation("Ошибка", "Сначала выберите текстовый файл", myWindow)
+			return
+		}
+		err := ConvertTxtToExcel(selectedFile, "result.xlsx")
+		if err != nil {
+			dialog.ShowError(err, myWindow)
+			return
+		}
+		dialog.ShowInformation("Готово", "Сохранено в файл: result.xlsx", myWindow)
+	})
+
+	intervalMinEntry := widget.NewEntry()
+	intervalMaxEntry := widget.NewEntry()
+	intervalMinEntry.SetPlaceHolder("Начальное значение")
+	intervalMaxEntry.SetPlaceHolder("Конечное значение")
+
+	resultLabel := widget.NewLabel("")
+
+	calcFreqBtn := widget.NewButton("Посчитать частоту", func() {
+		intervalMinStr := intervalMinEntry.Text
+		intervalMaxStr := intervalMaxEntry.Text
+		intervalMin, err := strconv.ParseFloat(intervalMinStr, 64)
+		if err != nil || intervalMin < 0 {
+			resultLabel.SetText("Введите корректный интервал")
+			return
+		}
+
+		intervalMax, err := strconv.ParseFloat(intervalMaxStr, 64)
+		if err != nil || intervalMax <= 0 || intervalMax <= intervalMin {
+			resultLabel.SetText("Введите корректный интервал")
+			return
+		}
+
+		data, err := ParseTimestamps(selectedFile)
+		if err != nil {
+			resultLabel.SetText("Ошибка чтения файла")
+			return
+		}
+		count, freq := CountFrequency(data, intervalMin, intervalMax)
+
+		resultLabel.SetText(fmt.Sprintf("Нажатий: %d\nЧастота: %.2f в сек", count, freq))
 	})
 
 	content := container.NewVBox(
-		nameOfTheExperimentLabel,
-		nameOfTheExperimentEntry,
-		durationOfTheExperimentLabel,
-		durationOfTheExperimentEntry,
-		buttonMeasure,
-		buttonUploadToTable,
+		fileLabel,
+		btnSelect,
+		btnConvertExcel,
+		intervalMinEntry,
+		intervalMaxEntry,
+		calcFreqBtn,
+		resultLabel,
 	)
 
-	w.SetContent(content)
-	w.Resize(fyne.NewSize(300, 200))
-	w.ShowAndRun()
+	myWindow.SetContent(content)
+	myWindow.Resize(fyne.NewSize(1000, 600))
+	myWindow.ShowAndRun()
+
 }

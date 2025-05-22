@@ -1,74 +1,169 @@
 package main
 
 import (
-	"fmt"
-	"fyne.io/fyne/v2/widget"
+	"bufio"
 	"github.com/xuri/excelize/v2"
-	"time"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
 )
 
-func safeSetCell(f *excelize.File, sheet, cell string, value any) {
-	if err := f.SetCellValue(sheet, cell, value); err != nil {
-		fmt.Printf("Ошибка записи в %s: %v\n", cell, err)
+func ConvertTxtToExcel(inputPath, outputPath string) error {
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return err
 	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
+
+	f := excelize.NewFile()
+	sheet := "Sheet1"
+
+	scanner := bufio.NewScanner(file)
+
+	var totalSeconds int
+	if scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		totalSeconds, _ = strconv.Atoi(line)
+	}
+
+	f.SetCellValue(sheet, "A1", "№")
+	f.SetCellValue(sheet, "B1", "Метка времени")
+	f.SetCellValue(sheet, "C1", "Время измерения, в секундах")
+	f.SetCellValue(sheet, "C2", totalSeconds)
+
+	row := 1
+	index := 0
+	var timestamps []float64
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		timeVal, err := strconv.ParseFloat(line, 64)
+		if err != nil {
+			continue
+		}
+		timestamps = append(timestamps, timeVal)
+		row++
+		f.SetCellValue(sheet, "A"+strconv.Itoa(row), index)
+		f.SetCellValue(sheet, "B"+strconv.Itoa(row), timeVal)
+		index++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	if len(timestamps) > 0 {
+		sort.Float64s(timestamps)
+
+		var deltas []float64
+		for i := 1; i < len(timestamps); i++ {
+			deltas = append(deltas, timestamps[i]-timestamps[i-1])
+		}
+
+		avgDelta := 0.0
+		minDelta := 0.0
+		maxDelta := 0.0
+
+		if len(deltas) > 0 {
+			sum := 0.0
+			minDelta = deltas[0]
+			maxDelta = deltas[0]
+			for _, d := range deltas {
+				sum += d
+				if d < minDelta {
+					minDelta = d
+				}
+				if d > maxDelta {
+					maxDelta = d
+				}
+			}
+			avgDelta = sum / float64(len(deltas))
+		}
+
+		f.SetCellValue(sheet, "D1", "Статистика")
+		f.SetCellValue(sheet, "D2", "Всего нажатий")
+		f.SetCellValue(sheet, "E2", len(timestamps))
+
+		f.SetCellValue(sheet, "D3", "Минимальный интервал (сек)")
+		f.SetCellValue(sheet, "E3", minDelta)
+
+		f.SetCellValue(sheet, "D4", "Максимальный интервал (сек)")
+		f.SetCellValue(sheet, "E4", maxDelta)
+
+		f.SetCellValue(sheet, "D5", "Средний интервал между нажатиями (сек)")
+		f.SetCellValue(sheet, "E5", avgDelta)
+	}
+
+	return f.SaveAs(outputPath)
 }
 
-func uploadValuesToTable(nameEntry *widget.Entry, durationEntry *widget.Entry) {
-	f := excelize.NewFile()
-	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Println(err)
+func ParseTimestamps(path string) ([]float64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var timestamps []float64
+	scanner := bufio.NewScanner(file)
+
+	if scanner.Scan() {
+		_ = scanner.Text()
+	}
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
 		}
-	}()
-
-	sheet := nameEntry.Text
-	if len(sheet) == 0 || len(sheet) > 31 {
-		fmt.Println("Ошибка: некорректное имя листа")
-		return
+		sec, err := strconv.ParseFloat(line, 64)
+		if err != nil {
+			continue
+		}
+		timestamps = append(timestamps, sec)
 	}
-	if err := f.SetSheetName(f.GetSheetName(0), sheet); err != nil {
-		fmt.Println("Ошибка переименования листа:", err)
-		return
-	}
+	return timestamps, scanner.Err()
+}
 
-	data := map[string]any{
-		"A1": "Время измерения, сек",
-		"B1": durationEntry.Text,
-		"A2": "Начало",
-		"A3": "Конец",
-		"A4": "Время, сек",
-		"B4": "Частота, вдох./сек.",
-	}
+func CountFrequency(data []float64, from, to float64) (int, float64) {
+	startIdx := -1
+	endIdx := -1
 
-	for cell, value := range data {
-		safeSetCell(f, sheet, cell, value)
+	for i, v := range data {
+		if v >= from {
+			startIdx = i
+			break
+		}
 	}
 
-	currentTime := time.Now()
-	timeStr := currentTime.Format("15:04:05")
-	fmt.Println("Начальное время:", timeStr)
-	safeSetCell(f, sheet, "B2", timeStr)
-
-	if len(measurementData) == 0 {
-		fmt.Println("Ошибка: нет данных для записи")
-		return
+	for i := len(data) - 1; i >= 0; i-- {
+		if data[i] <= to {
+			endIdx = i
+			break
+		}
 	}
 
-	for i, row := range measurementData[0] {
-		safeSetCell(f, sheet, fmt.Sprintf("A%d", 5+i), row)
-		safeSetCell(f, sheet, fmt.Sprintf("B%d", 5+i), measurementData[1][i])
+	if startIdx == -1 || endIdx == -1 || endIdx < startIdx {
+		return 0, 0.0
 	}
 
-	timeStr = currentTime.Format("15:04:05")
-	fmt.Println("Конечное время:", timeStr)
-	safeSetCell(f, sheet, "B3", timeStr)
+	count := float64(endIdx - startIdx + 1)
+	duration := data[endIdx] - data[startIdx]
 
-	fmt.Println("Uploading")
-
-	filename := sheet + ".xlsx"
-	if err := f.SaveAs(filename); err != nil {
-		fmt.Println("Ошибка:", err)
-		return
+	if duration <= 0 {
+		return int(count), 0.0
 	}
-	// TODO: Изменит - Время конца определяется по реальному времени, когда отработает прога => сейчас время начала и коца одинаковые
+
+	freq := count / duration
+
+	return int(count), freq
 }

@@ -35,3 +35,4 @@ debug/
 # Локальные переменные окружения
 .env
 *.xlsx
+credentials.json

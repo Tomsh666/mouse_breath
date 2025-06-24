@@ -44,6 +44,19 @@ func main() {
 		dialog.ShowInformation("Готово", "Сохранено в файл: result.xlsx", myWindow)
 	})
 
+	btnConvertGoogle := widget.NewButton("Преобразовать в Google Sheets", func() {
+		if selectedFile == "" {
+			dialog.ShowInformation("Ошибка", "Сначала выберите текстовый файл", myWindow)
+			return
+		}
+		err := ConvertTxtToGoogle(selectedFile)
+		if err != nil {
+			dialog.ShowError(err, myWindow)
+			return
+		}
+		dialog.ShowInformation("Готово", "Таблица обновлена на Google Drive", myWindow)
+	})
+
 	intervalMinEntry := widget.NewEntry()
 	intervalMaxEntry := widget.NewEntry()
 	intervalMinEntry.SetPlaceHolder("Начальное значение")
@@ -84,6 +97,7 @@ func main() {
 		intervalMaxEntry,
 		calcFreqBtn,
 		resultLabel,
+		btnConvertGoogle,
 	)
 
 	myWindow.SetContent(content)
